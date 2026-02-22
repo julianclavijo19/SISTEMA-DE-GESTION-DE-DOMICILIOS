@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft } from '@/lib/icons'
+
+export const dynamic = 'force-dynamic'
 import { NuevoDomiciliarioForm } from './nuevo-form'
 
 export default async function NuevoDomiciliarioPage() {

@@ -49,7 +49,7 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0A0A0A',
+        background: '#F8FAFC',
         padding: '1.25rem',
         position: 'relative',
         overflow: 'hidden',
@@ -61,7 +61,7 @@ export default function LoginPage() {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse 80% 60% at 50% -20%, rgba(255,255,255,0.06) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 80% 100%, rgba(255,255,255,0.04) 0%, transparent 60%)',
+            'radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0,0,0,0.03) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 80% 100%, rgba(0,0,0,0.02) 0%, transparent 60%)',
           pointerEvents: 'none',
         }}
       />
@@ -76,7 +76,7 @@ export default function LoginPage() {
           background: '#FFFFFF',
           borderRadius: '20px',
           overflow: 'hidden',
-          boxShadow: '0 0 0 1px rgba(0,0,0,0.04), 0 25px 50px -12px rgba(0,0,0,0.35)',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 25px 50px -12px rgba(0,0,0,0.1)',
         }}
       >
         {/* Brand header */}

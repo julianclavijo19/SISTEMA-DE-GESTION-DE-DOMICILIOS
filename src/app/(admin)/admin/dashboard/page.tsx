@@ -1,6 +1,8 @@
 import { requireRole } from '@/lib/auth'
 import { createSupabaseServer } from '@/lib/supabase-server'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboardPage() {
   await requireRole(['ADMIN'])
   const supabase = await createSupabaseServer()

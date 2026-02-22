@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Warning } from '@/lib/icons'
 
+export const dynamic = 'force-dynamic'
+
 export default async function NovedadesPage() {
   await requireRole(['ADMIN', 'SECRETARIA'])
   const supabase = await createSupabaseServer()

@@ -3,6 +3,8 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+
+export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { Plus, Warning } from '@/lib/icons'
 import { Alert, AlertDescription } from '@/components/ui/alert'
