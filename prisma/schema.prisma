@@ -1,0 +1,189 @@
+// Prisma schema — matches actual Supabase DB exactly
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ ENUMS ============
+
+enum rol_usuario {
+  ADMIN
+  SECRETARIA
+  DOMICILIARIO
+  RESTAURANTE
+}
+
+enum estado_usuario {
+  ACTIVO
+  INACTIVO
+}
+
+enum estado_domicilio {
+  PENDIENTE
+  NOTIFICADO
+  ASIGNADO
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+}
+
+// ============ MODELS ============
+
+model usuarios {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auth_id   String         @unique @db.Uuid
+  email     String
+  nombre    String
+  telefono  String?
+  rol       rol_usuario
+  estado    estado_usuario @default(ACTIVO)
+  creado_en DateTime       @default(now()) @db.Timestamptz(6)
+
+  domiciliarios        domiciliarios?
+  restaurantes         restaurantes?
+  novedades_reportadas novedades[]         @relation("novedades_reportado_por")
+  historial_cambiados  historial_estados[] @relation("historial_cambiado_por")
+  cortes_creados       cortes_caja[]       @relation("cortes_creado_por")
+  cancelaciones        domicilios[]        @relation("domicilio_cancelado_por")
+
+  @@index([auth_id])
+  @@index([rol])
+}
+
+model domiciliarios {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id        String    @unique @db.Uuid
+  cedula            String
+  disponible        Boolean   @default(false)
+  foto_perfil       String?
+  foto_moto         String?
+  soat_vence        DateTime? @db.Date
+  licencia_vence    DateTime? @db.Date
+  tecno_mec_vence   DateTime? @db.Date
+  doc_cedula_frente String?
+  doc_cedula_reverso String?
+  doc_tarjeta_prop  String?
+  doc_soat          String?
+  doc_tecno_mec     String?
+  doc_licencia      String?
+  creado_en         DateTime  @default(now()) @db.Timestamptz(6)
+  actualizado_en    DateTime  @default(now()) @db.Timestamptz(6)
+
+  usuario  usuarios             @relation(fields: [usuario_id], references: [id])
+  domicilios domicilios[]
+  rechazos rechazos_domicilio[]
+
+  @@index([disponible])
+}
+
+model restaurantes {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id     String   @unique @db.Uuid
+  nit            String?
+  direccion      String?
+  horario        String?
+  logo           String?
+  creado_en      DateTime @default(now()) @db.Timestamptz(6)
+  actualizado_en DateTime @default(now()) @db.Timestamptz(6)
+
+  usuario    usuarios     @relation(fields: [usuario_id], references: [id])
+  domicilios domicilios[]
+}
+
+model domicilios {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurante_id      String           @db.Uuid
+  domiciliario_id     String?          @db.Uuid
+  nombre_cliente      String
+  telefono_cliente    String
+  direccion_entrega   String
+  referencia_direccion String?
+  valor_pedido        Decimal          @db.Decimal
+  observaciones       String?
+  porcentaje_comision Decimal          @default(20) @db.Decimal
+  comision_empresa    Decimal?         @db.Decimal
+  estado              estado_domicilio @default(PENDIENTE)
+  motivo_cancelacion  String?
+  cancelado_por_id    String?          @db.Uuid
+  creado_en           DateTime         @default(now()) @db.Timestamptz(6)
+  actualizado_en      DateTime         @default(now()) @db.Timestamptz(6)
+  entregado_en        DateTime?        @db.Timestamptz(6)
+
+  restaurante       restaurantes       @relation(fields: [restaurante_id], references: [id])
+  domiciliario      domiciliarios?     @relation(fields: [domiciliario_id], references: [id])
+  cancelado_por     usuarios?          @relation("domicilio_cancelado_por", fields: [cancelado_por_id], references: [id])
+  historial_estados historial_estados[]
+  novedades         novedades[]
+  rechazos          rechazos_domicilio[]
+
+  @@index([estado])
+  @@index([restaurante_id])
+  @@index([domiciliario_id])
+  @@index([creado_en])
+}
+
+model historial_estados {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domicilio_id   String           @db.Uuid
+  estado         estado_domicilio
+  cambiado_por_id String?         @db.Uuid
+  nota           String?
+  creado_en      DateTime         @default(now()) @db.Timestamptz(6)
+
+  domicilio    domicilios @relation(fields: [domicilio_id], references: [id])
+  cambiado_por usuarios?  @relation("historial_cambiado_por", fields: [cambiado_por_id], references: [id])
+
+  @@index([domicilio_id])
+}
+
+model novedades {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domicilio_id     String   @db.Uuid
+  reportado_por_id String   @db.Uuid
+  descripcion      String
+  creado_en        DateTime @default(now()) @db.Timestamptz(6)
+
+  domicilio     domicilios @relation(fields: [domicilio_id], references: [id])
+  reportado_por usuarios   @relation("novedades_reportado_por", fields: [reportado_por_id], references: [id])
+
+  @@index([domicilio_id])
+}
+
+model rechazos_domicilio {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domicilio_id    String   @db.Uuid
+  domiciliario_id String   @db.Uuid
+  creado_en       DateTime @default(now()) @db.Timestamptz(6)
+
+  domicilio    domicilios    @relation(fields: [domicilio_id], references: [id])
+  domiciliario domiciliarios @relation(fields: [domiciliario_id], references: [id])
+
+  @@unique([domicilio_id, domiciliario_id])
+}
+
+model configuracion_sistema {
+  id                       String   @id @default("singleton")
+  porcentaje_comision      Decimal  @default(20) @db.Decimal
+  tiempo_limite_aceptacion Int      @default(300)
+  motivos_cancelacion      String[]
+  actualizado_en           DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model cortes_caja {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fecha_inicio           DateTime @db.Timestamptz(6)
+  fecha_fin              DateTime @db.Timestamptz(6)
+  total_domicilios       Int      @default(0)
+  total_bruto            Decimal  @default(0) @db.Decimal
+  total_comisiones       Decimal  @default(0) @db.Decimal
+  total_pago_domiciliarios Decimal @default(0) @db.Decimal
+  saldo_neto             Decimal  @default(0) @db.Decimal
+  creado_por_id          String   @db.Uuid
+  creado_en              DateTime @default(now()) @db.Timestamptz(6)
+
+  creado_por usuarios @relation("cortes_creado_por", fields: [creado_por_id], references: [id])
+}
