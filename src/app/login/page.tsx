@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowser } from '@/lib/supabase-browser'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Truck, Package, MapPin } from '@/lib/icons'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -96,11 +97,11 @@ export default function LoginPage() {
 
           {/* Feature links */}
           <div className="login-features">
-            <span className="login-feature">🛵 Entregas</span>
+            <span className="login-feature"><Truck size={14} /> Entregas</span>
             <span className="login-sep">|</span>
-            <span className="login-feature">📦 Pedidos</span>
+            <span className="login-feature"><Package size={14} /> Pedidos</span>
             <span className="login-sep">|</span>
-            <span className="login-feature">📍 Rastreo</span>
+            <span className="login-feature"><MapPin size={14} /> Rastreo</span>
           </div>
 
           <p className="login-location">Ocaña, Norte de Santander</p>
