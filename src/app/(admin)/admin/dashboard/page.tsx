@@ -1,6 +1,10 @@
 import { requireRole } from '@/lib/auth'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import { DashboardCharts } from './dashboard-charts'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { EstadoBadge } from '@/components/ui/estado-badge'
+import { formatDistanceToNow } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,12 +29,11 @@ export default async function AdminDashboardPage() {
   hace7Dias.setDate(hace7Dias.getDate() - 6)
   const hace7DiasISO = hace7Dias.toISOString()
 
-  const [rActivos, rEntregados, rCancelados, rEnCurso, rDomActivos] = await Promise.all([
+  const [rActivos, rEntregados, rCancelados, rEnCurso] = await Promise.all([
     supabase.from('domicilios').select('*', { count: 'exact', head: true }).gte('creado_en', hoyISO).lt('creado_en', mananaISO).neq('estado', 'CANCELADO'),
     supabase.from('domicilios').select('*', { count: 'exact', head: true }).gte('creado_en', hoyISO).lt('creado_en', mananaISO).eq('estado', 'ENTREGADO'),
     supabase.from('domicilios').select('*', { count: 'exact', head: true }).gte('creado_en', hoyISO).lt('creado_en', mananaISO).eq('estado', 'CANCELADO'),
     supabase.from('domicilios').select('*', { count: 'exact', head: true }).gte('creado_en', hoyISO).lt('creado_en', mananaISO).in('estado', ['PENDIENTE', 'NOTIFICADO', 'ASIGNADO', 'EN_CAMINO']),
-    supabase.from('domiciliarios').select('id, disponible, usuarios!inner(nombre, estado)').eq('usuarios.estado', 'ACTIVO'),
   ])
 
   // Entregados hoy con valores
@@ -111,46 +114,12 @@ export default async function AdminDashboardPage() {
     .sort((a, b) => b[1].comision - a[1].comision)
     .slice(0, 5)
 
-  // Domiciliarios con entregas del día
-  const { data: domiciliariosConEntregas } = await supabase
+  // Últimos domicilios (8 más recientes)
+  const { data: ultimosDomicilios } = await supabase
     .from('domicilios')
-    .select('domiciliario_id, domiciliarios(id, disponible, usuarios(nombre, estado))')
-    .gte('creado_en', hoyISO).lt('creado_en', mananaISO)
-    .eq('estado', 'ENTREGADO')
-    .not('domiciliario_id', 'is', null)
-
-  const entregasPorDom: Record<string, { nombre: string; entregas: number; disponible: boolean }> = {}
-  for (const d of domiciliariosConEntregas ?? []) {
-    const dom = d.domiciliarios as any
-    if (!dom?.usuarios) continue
-    const id = dom.id
-    if (!entregasPorDom[id]) {
-      entregasPorDom[id] = {
-        nombre: dom.usuarios.nombre ?? 'Sin nombre',
-        entregas: 0,
-        disponible: dom.disponible ?? false,
-      }
-    }
-    entregasPorDom[id].entregas++
-  }
-
-  const domiciliariosActivos = rDomActivos.data ?? []
-  for (const da of domiciliariosActivos) {
-    const dom = da as any
-    if (!entregasPorDom[dom.id]) {
-      entregasPorDom[dom.id] = {
-        nombre: dom.usuarios?.nombre ?? 'Sin nombre',
-        entregas: 0,
-        disponible: dom.disponible ?? false,
-      }
-    }
-  }
-
-  const listaDomiciliarios = Object.values(entregasPorDom)
-    .sort((a, b) => b.entregas - a.entregas)
-
-  const disponibles = listaDomiciliarios.filter(d => d.disponible).length
-  const enEntrega = listaDomiciliarios.filter(d => !d.disponible).length
+    .select('id, nombre_cliente, direccion_entrega, valor_pedido, estado, creado_en, restaurantes(usuarios(nombre))')
+    .order('creado_en', { ascending: false })
+    .limit(8)
 
   const fechaHoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long',
@@ -206,7 +175,7 @@ export default async function AdminDashboardPage() {
 
         {/* Right panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Restaurantes — primero, expandido */}
+          {/* Restaurantes — expandido */}
           <div className="panel-card" style={{ flex: 1, minHeight: '280px' }}>
             <div className="panel-card-title">Restaurantes hoy</div>
             {topRestaurantes.length === 0 ? (
@@ -232,51 +201,49 @@ export default async function AdminDashboardPage() {
               </table>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Domiciliarios — debajo, sin cambios */}
-          <div className="panel-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <span className="panel-card-title" style={{ marginBottom: 0 }}>Domiciliarios</span>
-              <span style={{ fontSize: '0.6875rem', color: 'var(--ds-text-muted)' }}>{disponibles} disponibles</span>
-            </div>
-
-            {/* Mini cards Libres / Ocupados */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <div style={{ background: '#ECFDF5', borderRadius: '8px', padding: '0.5rem 0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#059669', display: 'block' }}>{disponibles}</span>
-                <span style={{ fontSize: '0.6875rem', color: '#059669' }}>Libres</span>
-              </div>
-              <div style={{ background: '#FFFBEB', borderRadius: '8px', padding: '0.5rem 0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#D97706', display: 'block' }}>{enEntrega}</span>
-                <span style={{ fontSize: '0.6875rem', color: '#D97706' }}>Ocupados</span>
-              </div>
-            </div>
-
-            {listaDomiciliarios.length === 0 ? (
-              <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin domiciliarios activos</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--ds-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre</th>
-                    <th style={{ textAlign: 'center', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estado</th>
-                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Entregas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {listaDomiciliarios.slice(0, 8).map((dom) => (
-                    <tr key={dom.nombre} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
-                      <td style={{ padding: '0.5rem 0', color: 'var(--ds-text)' }}>{dom.nombre.split(' ').slice(0, 2).join(' ')}</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'center', fontSize: '0.75rem', color: dom.disponible ? 'var(--ds-success)' : 'var(--ds-text-muted)' }}>
-                        {dom.disponible ? 'Libre' : 'Ocupado'}
-                      </td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-ibm-mono)' }}>{dom.entregas}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+      {/* Últimos domicilios — full width */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--ds-text)', marginBottom: '0.75rem' }}>Últimos domicilios</h2>
+        <div className="panel-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-[11px] uppercase tracking-wider">Cliente</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Restaurante</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Dirección</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Valor</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Estado</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Hace</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(ultimosDomicilios ?? []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">
+                    Sin domicilios registrados aún
+                  </TableCell>
+                </TableRow>
+              ) : (
+                (ultimosDomicilios ?? []).map((d: any) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium">{d.nombre_cliente}</TableCell>
+                    <TableCell>{d.restaurantes?.usuarios?.nombre ?? '—'}</TableCell>
+                    <TableCell className="truncate max-w-[180px] text-muted-foreground">{d.direccion_entrega}</TableCell>
+                    <TableCell className="font-medium" style={{ fontFamily: 'var(--font-ibm-mono)' }}>
+                      ${Number(d.valor_pedido ?? 0).toLocaleString('es-CO')}
+                    </TableCell>
+                    <TableCell><EstadoBadge estado={d.estado} /></TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatDistanceToNow(new Date(d.creado_en), { addSuffix: true, locale: es })}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>
