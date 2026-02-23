@@ -831,6 +831,28 @@
   width: 20px;
   height: 20px;
 }
+.ds-bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--ds-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.ds-bottom-nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.ds-bottom-nav-btn:hover {
+  color: #0A0A0A;
+}
 
 /* ================================================
    Scrollbar

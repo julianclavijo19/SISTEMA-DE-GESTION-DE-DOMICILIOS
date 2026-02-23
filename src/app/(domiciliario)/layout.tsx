@@ -2,7 +2,6 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { createSupabaseBrowser } from '@/lib/supabase-browser'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { House, ClockCounterClockwise, SignOut } from '@/lib/icons'
 
@@ -27,13 +26,6 @@ export default function DomiciliarioLayout({
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto" style={{ background: 'var(--ds-bg)' }}>
-      <header className="ds-mobile-header">
-        <span className="brand-delivery" style={{ fontSize: '1.25rem' }}>delivery</span>
-        <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-auto">
-          <SignOut className="h-5 w-5" />
-        </Button>
-      </header>
-
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-4">{children}</main>
 
@@ -53,6 +45,10 @@ export default function DomiciliarioLayout({
             </Link>
           )
         })}
+        <button onClick={handleLogout} className="ds-bottom-nav-btn">
+          <SignOut />
+          Salir
+        </button>
       </nav>
     </div>
   )
