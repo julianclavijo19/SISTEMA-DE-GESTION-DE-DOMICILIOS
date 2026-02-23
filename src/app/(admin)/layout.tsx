@@ -37,7 +37,7 @@ const navSections = [
   {
     label: 'SISTEMA',
     items: [
-      { href: '/admin/reportes', label: 'Reportes', icon: ChartBar },
+      { href: '/admin/reportes', label: 'Estadísticas', icon: ChartBar },
       { href: '/admin/configuracion', label: 'Configuración', icon: GearSix },
     ],
   },

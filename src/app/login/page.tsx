@@ -58,7 +58,7 @@ export default function LoginPage() {
       {/* Right form side */}
       <div className="login-form-side">
         <div className="login-form-container">
-          <h1>Iniciar sesión</h1>
+          <h1>Bienvenido</h1>
           <p>Ingresa tus credenciales para continuar</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -108,7 +108,19 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-xs mt-8" style={{ color: 'var(--ds-text-muted)' }}>
+          <div className="flex items-center justify-center gap-6 mt-8">
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ds-text-muted)' }}>
+              <span>📦</span> Entregas
+            </div>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ds-text-muted)' }}>
+              <span>📋</span> Pedidos
+            </div>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ds-text-muted)' }}>
+              <span>📍</span> Rastreo
+            </div>
+          </div>
+
+          <p className="text-center text-xs mt-4" style={{ color: 'var(--ds-text-muted)' }}>
             Ocaña, Norte de Santander
           </p>
         </div>

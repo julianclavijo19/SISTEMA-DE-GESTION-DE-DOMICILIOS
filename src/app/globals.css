@@ -620,7 +620,9 @@
   overflow: hidden;
 }
 @media (max-width: 768px) {
-  .login-brand { display: none; }
+  .login-page { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .login-brand { display: flex; padding: 2rem 1.5rem; min-height: auto; }
+  .login-brand-content { max-width: 100%; }
 }
 .login-brand::before {
   content: '';

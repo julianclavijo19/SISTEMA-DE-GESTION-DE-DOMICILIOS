@@ -12,29 +12,38 @@ import {
   Area,
 } from 'recharts'
 
-interface ChartDataItem {
-  dia: string
-  domicilios: number
-  ingresos: number
-  comisiones: number
+interface PorHoraItem {
+  hora: string
+  cantidad: number
 }
 
-export function DashboardCharts({ data }: { data: ChartDataItem[] }) {
+interface Ingresos7dItem {
+  dia: string
+  ingresos: number
+}
+
+export function DashboardCharts({
+  porHora,
+  ingresos7d,
+}: {
+  porHora: PorHoraItem[]
+  ingresos7d: Ingresos7dItem[]
+}) {
   const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-      {/* Domicilios por día */}
+      {/* Gráfica 1 — Domicilios por hora (hoy) — AreaChart */}
       <div className="panel-card">
-        <div className="panel-card-title">Domicilios por día</div>
+        <div className="panel-card-title">Domicilios por hora (hoy)</div>
         <div style={{ width: '100%', height: 220 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
+            <AreaChart data={porHora} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" vertical={false} />
               <XAxis
-                dataKey="dia"
+                dataKey="hora"
                 tick={{ fontSize: 11, fill: 'var(--ds-text-muted)' }}
-                axisLine={{ stroke: 'var(--ds-border)' }}
+                axisLine={false}
                 tickLine={false}
               />
               <YAxis
@@ -52,23 +61,36 @@ export function DashboardCharts({ data }: { data: ChartDataItem[] }) {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                 }}
               />
-              <Bar dataKey="domicilios" fill="#059669" radius={[4, 4, 0, 0]} name="Domicilios" />
-            </BarChart>
+              <defs>
+                <linearGradient id="gradDomicilios" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#111113" stopOpacity={0.06} />
+                  <stop offset="95%" stopColor="#111113" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="cantidad"
+                stroke="#111113"
+                strokeWidth={1.5}
+                fill="url(#gradDomicilios)"
+                name="Domicilios"
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Ingresos por día */}
+      {/* Gráfica 2 — Ingresos últimos 7 días — BarChart */}
       <div className="panel-card">
-        <div className="panel-card-title">Ingresos por día</div>
+        <div className="panel-card-title">Ingresos últimos 7 días</div>
         <div style={{ width: '100%', height: 220 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" />
+            <BarChart data={ingresos7d} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--ds-border-light)" vertical={false} />
               <XAxis
                 dataKey="dia"
                 tick={{ fontSize: 11, fill: 'var(--ds-text-muted)' }}
-                axisLine={{ stroke: 'var(--ds-border)' }}
+                axisLine={false}
                 tickLine={false}
               />
               <YAxis
@@ -78,7 +100,7 @@ export function DashboardCharts({ data }: { data: ChartDataItem[] }) {
                 tickFormatter={formatCurrency}
               />
               <Tooltip
-                formatter={(value: number) => [formatCurrency(value)]}
+                formatter={(value: number) => [formatCurrency(value), 'Ingresos']}
                 contentStyle={{
                   background: 'var(--ds-surface)',
                   border: '1px solid var(--ds-border)',
@@ -87,19 +109,14 @@ export function DashboardCharts({ data }: { data: ChartDataItem[] }) {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                 }}
               />
-              <defs>
-                <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#059669" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorComisiones" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#D97706" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#D97706" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area type="monotone" dataKey="ingresos" stroke="#059669" strokeWidth={2} fill="url(#colorIngresos)" name="Ingresos" />
-              <Area type="monotone" dataKey="comisiones" stroke="#D97706" strokeWidth={2} fill="url(#colorComisiones)" name="Comisiones" />
-            </AreaChart>
+              <Bar
+                dataKey="ingresos"
+                fill="#111113"
+                fillOpacity={0.85}
+                radius={[4, 4, 0, 0]}
+                name="Ingresos"
+              />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>

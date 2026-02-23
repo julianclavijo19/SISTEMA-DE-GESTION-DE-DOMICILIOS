@@ -20,7 +20,7 @@ export default async function AdminDashboardPage() {
   ayer.setDate(ayer.getDate() - 1)
   const ayerISO = ayer.toISOString()
 
-  // 7 días para gráficas
+  // 7 días para gráfica de ingresos
   const hace7Dias = new Date(hoy)
   hace7Dias.setDate(hace7Dias.getDate() - 6)
   const hace7DiasISO = hace7Dias.toISOString()
@@ -43,31 +43,44 @@ export default async function AdminDashboardPage() {
     .from('domicilios').select('valor_pedido')
     .gte('creado_en', ayerISO).lt('creado_en', hoyISO).eq('estado', 'ENTREGADO')
 
-  // Domicilios últimos 7 días para gráficas
+  // Domicilios de hoy para gráfica por hora
+  const { data: domiciliosHoy } = await supabase
+    .from('domicilios')
+    .select('creado_en')
+    .gte('creado_en', hoyISO)
+    .lt('creado_en', mananaISO)
+
+  // Datos gráfica: domicilios por hora (hoy)
+  const porHora = Array.from({ length: 24 }, (_, i) => ({
+    hora: `${i}h`,
+    cantidad: (domiciliosHoy ?? []).filter(d => new Date(d.creado_en).getHours() === i).length,
+  }))
+
+  // Domicilios últimos 7 días para gráfica de ingresos
   const { data: domicilios7d } = await supabase
     .from('domicilios')
-    .select('creado_en, valor_pedido, comision_empresa, estado')
+    .select('creado_en, valor_pedido, estado')
+    .eq('estado', 'ENTREGADO')
     .gte('creado_en', hace7DiasISO)
     .lt('creado_en', mananaISO)
 
-  // Preparar datos de gráficas (7 días)
-  const chartData: { dia: string; domicilios: number; ingresos: number; comisiones: number }[] = []
+  // Datos gráfica: ingresos últimos 7 días
+  const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const ingresos7d: { dia: string; ingresos: number }[] = []
   for (let i = 6; i >= 0; i--) {
     const fecha = new Date(hoy)
     fecha.setDate(fecha.getDate() - i)
     const fechaStr = fecha.toISOString().split('T')[0]
-    const diaLabel = fecha.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })
+    const diaLabel = diasSemana[fecha.getDay()]
 
     const delDia = (domicilios7d ?? []).filter(d => {
       const dFecha = new Date(d.creado_en).toISOString().split('T')[0]
       return dFecha === fechaStr
     })
 
-    chartData.push({
+    ingresos7d.push({
       dia: diaLabel,
-      domicilios: delDia.length,
-      ingresos: delDia.filter(d => d.estado === 'ENTREGADO').reduce((s, d) => s + Number(d.valor_pedido ?? 0), 0),
-      comisiones: delDia.filter(d => d.estado === 'ENTREGADO').reduce((s, d) => s + Number(d.comision_empresa ?? 0), 0),
+      ingresos: delDia.reduce((s, d) => s + Number(d.valor_pedido ?? 0), 0),
     })
   }
 
@@ -97,12 +110,6 @@ export default async function AdminDashboardPage() {
   const topRestaurantes = Object.entries(comisionesPorRestaurante)
     .sort((a, b) => b[1].comision - a[1].comision)
     .slice(0, 5)
-
-  // Domicilios recientes
-  const { data: domicilios } = await supabase
-    .from('domicilios')
-    .select('id, nombre_cliente, direccion_entrega, valor_pedido, estado, creado_en, restaurantes(usuarios(nombre)), domiciliarios(usuarios(nombre))')
-    .order('creado_en', { ascending: false }).limit(10)
 
   // Domiciliarios con entregas del día
   const { data: domiciliariosConEntregas } = await supabase
@@ -145,18 +152,6 @@ export default async function AdminDashboardPage() {
   const disponibles = listaDomiciliarios.filter(d => d.disponible).length
   const enEntrega = listaDomiciliarios.filter(d => !d.disponible).length
 
-  function getEstadoLabel(estado: string) {
-    const labels: Record<string, string> = {
-      PENDIENTE: 'Pendiente',
-      NOTIFICADO: 'Notificado',
-      ASIGNADO: 'Asignado',
-      EN_CAMINO: 'En camino',
-      ENTREGADO: 'Entregado',
-      CANCELADO: 'Cancelado',
-    }
-    return labels[estado] ?? estado
-  }
-
   const fechaHoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long',
     year: 'numeric',
@@ -173,7 +168,7 @@ export default async function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* KPI row — responsive via .kpi-grid CSS class */}
+      {/* KPI row — 4 tarjetas principales */}
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="kpi-card" style={{ flexDirection: 'column', gap: '0.25rem' }}>
           <span className="kpi-label">Domicilios hoy</span>
@@ -202,68 +197,43 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Main content: table + right panels */}
+      {/* Main content: gráficas + right panels */}
       <div className="dash-content">
-        {/* Left: Domicilios recientes table */}
-        <div className="ds-table-card">
-          <div className="ds-table-header">
-            <span className="ds-table-title">Últimos domicilios</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{totalHoy} hoy</span>
-          </div>
-          {(!domicilios || domicilios.length === 0) ? (
-            <div className="empty-state">No hay domicilios registrados hoy.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="ds-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Restaurante</th>
-                    <th>Domiciliario</th>
-                    <th>Valor</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {domicilios.map((d: any) => (
-                    <tr key={d.id}>
-                      <td>
-                        <span style={{ fontWeight: 500, color: 'var(--ds-text)', fontSize: '0.8125rem' }}>
-                          {d.nombre_cliente}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ color: 'var(--ds-text-secondary)', fontSize: '0.8125rem' }}>
-                          {(d.restaurantes as any)?.usuarios?.nombre ?? '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ color: 'var(--ds-text-secondary)', fontSize: '0.8125rem' }}>
-                          {(d.domiciliarios as any)?.usuarios?.nombre ?? '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: 600, color: 'var(--ds-text)', fontSize: '0.8125rem', fontFamily: 'var(--font-ibm-mono)' }}>
-                          ${Number(d.valor_pedido).toLocaleString('es-CO')}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge status-${d.estado.toLowerCase()}`}>
-                          <span className="status-dot" />
-                          {getEstadoLabel(d.estado)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        {/* Left: 2 gráficas apiladas */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <DashboardCharts porHora={porHora} ingresos7d={ingresos7d} />
         </div>
 
         {/* Right panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Domiciliarios — primero */}
+          {/* Restaurantes — primero, expandido */}
+          <div className="panel-card" style={{ flex: 1, minHeight: '280px' }}>
+            <div className="panel-card-title">Restaurantes hoy</div>
+            {topRestaurantes.length === 0 ? (
+              <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin actividad</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--ds-border)' }}>
+                    <th style={{ textAlign: 'left', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre</th>
+                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pedidos</th>
+                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topRestaurantes.map(([nombre, data]) => (
+                    <tr key={nombre} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
+                      <td style={{ padding: '0.5rem 0', color: 'var(--ds-text)' }}>{nombre}</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'right', color: 'var(--ds-text-secondary)', fontFamily: 'var(--font-ibm-mono)' }}>{data.pedidos}</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>${data.comision.toLocaleString('es-CO')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Domiciliarios — debajo, sin cambios */}
           <div className="panel-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <span className="panel-card-title" style={{ marginBottom: 0 }}>Domiciliarios</span>
@@ -307,39 +277,7 @@ export default async function AdminDashboardPage() {
               </table>
             )}
           </div>
-
-          {/* Restaurantes — después */}
-          <div className="panel-card">
-            <div className="panel-card-title">Restaurantes hoy</div>
-            {topRestaurantes.length === 0 ? (
-              <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin actividad</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--ds-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre</th>
-                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pedidos</th>
-                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topRestaurantes.map(([nombre, data]) => (
-                    <tr key={nombre} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
-                      <td style={{ padding: '0.5rem 0', color: 'var(--ds-text)' }}>{nombre}</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'right', color: 'var(--ds-text-secondary)', fontFamily: 'var(--font-ibm-mono)' }}>{data.pedidos}</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>${data.comision.toLocaleString('es-CO')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
         </div>
-      </div>
-
-      {/* Gráficas — debajo del contenido principal */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <DashboardCharts data={chartData} />
       </div>
     </div>
   )
