@@ -3,9 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowser } from '@/lib/supabase-browser'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function LoginPage() {
@@ -43,36 +40,32 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      {/* Left brand panel — solid black */}
-      <div className="login-brand">
-        <div className="login-brand-content">
-          <span className="brand-delivery" style={{ fontSize: '4rem', color: '#FFFFFF' }}>
+      <div className="login-card">
+        {/* Header negro */}
+        <div className="login-card-header">
+          <span className="brand-delivery" style={{ fontSize: '2.25rem', color: '#FFFFFF', fontWeight: 400 }}>
             delivery
           </span>
-          <p className="login-brand-subtitle">
+          <p className="login-card-subtitle">
             SISTEMA DE GESTIÓN DE DOMICILIOS
           </p>
         </div>
-      </div>
 
-      {/* Right form side */}
-      <div className="login-form-side">
-        <div className="login-form-container">
-          <h1>Bienvenido</h1>
-          <p>Ingresa tus credenciales para continuar</p>
+        {/* Formulario blanco */}
+        <div className="login-card-body">
+          <h2 className="login-card-title">Bienvenido</h2>
+          <p className="login-card-desc">Ingresa tus credenciales para continuar</p>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleLogin} className="login-form">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" style={{ marginBottom: '0.5rem' }}>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Correo electrónico
-              </Label>
-              <Input
+            <div className="login-field">
+              <label htmlFor="email">Correo electrónico</label>
+              <input
                 id="email"
                 type="email"
                 placeholder="correo@ejemplo.com"
@@ -83,11 +76,9 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Contraseña
-              </Label>
-              <Input
+            <div className="login-field">
+              <label htmlFor="password">Contraseña</label>
+              <input
                 id="password"
                 type="password"
                 placeholder="••••••••"
@@ -98,31 +89,21 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full h-11 text-sm font-semibold"
-              disabled={loading}
-              style={{ background: '#0A0A0A', color: '#FFFFFF', borderRadius: '10px' }}
-            >
+            <button type="submit" className="login-btn" disabled={loading}>
               {loading ? 'Ingresando...' : 'Iniciar sesión'}
-            </Button>
+            </button>
           </form>
 
-          <div className="login-footer-features">
-            <div className="login-footer-feature">
-              <span>📦</span> Entregas
-            </div>
-            <div className="login-footer-feature">
-              <span>📋</span> Pedidos
-            </div>
-            <div className="login-footer-feature">
-              <span>📍</span> Rastreo
-            </div>
+          {/* Feature links */}
+          <div className="login-features">
+            <span className="login-feature">🛵 Entregas</span>
+            <span className="login-sep">|</span>
+            <span className="login-feature">📦 Pedidos</span>
+            <span className="login-sep">|</span>
+            <span className="login-feature">📍 Rastreo</span>
           </div>
 
-          <p className="text-center text-xs mt-4" style={{ color: 'var(--ds-text-muted)' }}>
-            Ocaña, Norte de Santander
-          </p>
+          <p className="login-location">Ocaña, Norte de Santander</p>
         </div>
       </div>
     </div>
