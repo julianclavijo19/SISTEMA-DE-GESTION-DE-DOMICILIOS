@@ -32,7 +32,7 @@ export function DashboardCharts({
   const formatCurrency = (value: number) => `$${value.toLocaleString('es-CO')}`
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+    <div className="dash-charts-grid">
       {/* Gráfica 1 — Domicilios por hora (hoy) — AreaChart */}
       <div className="panel-card">
         <div className="panel-card-title">Domicilios por hora (hoy)</div>
