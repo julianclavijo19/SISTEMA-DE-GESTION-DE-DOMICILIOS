@@ -4,8 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { CurrencyDollar, TrendUp, Package, CheckCircle, Users } from '@/lib/icons'
 
-export const dynamic = 'force-dynamic'
-
 export default async function ReportesPage() {
   await requireRole(['ADMIN'])
   const supabase = await createSupabaseServer()

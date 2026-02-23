@@ -233,6 +233,13 @@
   .dash-content { grid-template-columns: 1fr; }
 }
 
+/* Charts grid responsive */
+@media (max-width: 768px) {
+  .panel-card .recharts-responsive-container {
+    min-height: 180px;
+  }
+}
+
 .dash-header {
   display: flex;
   align-items: center;
@@ -591,8 +598,118 @@
 }
 
 /* ================================================
-   Login — styles handled inline in component
+   Login
    ================================================ */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #FFFFFF;
+}
+@media (max-width: 768px) {
+  .login-page { grid-template-columns: 1fr; }
+}
+.login-brand {
+  background: #0A0A0A;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  position: relative;
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .login-brand { display: none; }
+}
+.login-brand::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+  top: 10%;
+  left: 20%;
+}
+.login-brand-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 380px;
+}
+.login-brand-logo {
+  width: 64px;
+  height: 64px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  margin: 0 auto 2rem;
+  backdrop-filter: blur(8px);
+}
+.login-brand h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+.login-brand p {
+  font-size: 0.875rem;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.6;
+  margin: 0;
+}
+.login-brand-features {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+.login-brand-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.8);
+}
+.login-brand-feature-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+.login-form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: #FFFFFF;
+}
+.login-form-container {
+  width: 100%;
+  max-width: 380px;
+}
+.login-form-container h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--ds-text);
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+}
+.login-form-container > p {
+  font-size: 0.875rem;
+  color: var(--ds-text-muted);
+  margin: 0 0 2rem;
+}
 
 /* ================================================
    Empty States

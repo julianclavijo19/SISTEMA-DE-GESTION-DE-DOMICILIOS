@@ -11,6 +11,11 @@ export async function crearDomiciliario(data: {
   telefono: string
   cedula: string
   password: string
+  placa?: string
+  modelo_moto?: string
+  tiene_tecnomecanica?: boolean
+  tiene_soat?: boolean
+  tiene_licencia?: boolean
 }) {
   const supabaseAdmin = await createSupabaseAdmin()
 
@@ -48,6 +53,11 @@ export async function crearDomiciliario(data: {
     const { error: domError } = await supabaseAdmin.from('domiciliarios').insert({
       usuario_id: usuario.id,
       cedula: data.cedula,
+      placa: data.placa || null,
+      modelo_moto: data.modelo_moto || null,
+      tiene_tecnomecanica: data.tiene_tecnomecanica ?? false,
+      tiene_soat: data.tiene_soat ?? false,
+      tiene_licencia: data.tiene_licencia ?? false,
     })
 
     if (domError) throw new Error('Error creando domiciliario: ' + domError.message)

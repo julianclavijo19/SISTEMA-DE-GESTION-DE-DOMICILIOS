@@ -3,8 +3,6 @@ import { createSupabaseServer } from '@/lib/supabase-server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfiguracionForm } from './configuracion-form'
 
-export const dynamic = 'force-dynamic'
-
 export default async function ConfiguracionPage() {
   await requireRole(['ADMIN'])
   const supabase = await createSupabaseServer()
