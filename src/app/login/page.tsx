@@ -49,8 +49,8 @@ export default function LoginPage() {
           <span className="brand-delivery" style={{ fontSize: '4rem', color: '#FFFFFF' }}>
             delivery
           </span>
-          <p style={{ marginTop: '1rem' }}>
-            Sistema de gestión de domicilios
+          <p className="login-brand-subtitle">
+            SISTEMA DE GESTIÓN DE DOMICILIOS
           </p>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function LoginPage() {
       {/* Right form side */}
       <div className="login-form-side">
         <div className="login-form-container">
-          <h1>Iniciar sesión</h1>
+          <h1>Bienvenido</h1>
           <p>Ingresa tus credenciales para continuar</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -102,13 +102,25 @@ export default function LoginPage() {
               type="submit"
               className="w-full h-11 text-sm font-semibold"
               disabled={loading}
-              style={{ background: '#0A0A0A', color: '#FFFFFF' }}
+              style={{ background: '#0A0A0A', color: '#FFFFFF', borderRadius: '10px' }}
             >
               {loading ? 'Ingresando...' : 'Iniciar sesión'}
             </Button>
           </form>
 
-          <p className="text-center text-xs mt-8" style={{ color: 'var(--ds-text-muted)' }}>
+          <div className="login-footer-features">
+            <div className="login-footer-feature">
+              <span>📦</span> Entregas
+            </div>
+            <div className="login-footer-feature">
+              <span>📋</span> Pedidos
+            </div>
+            <div className="login-footer-feature">
+              <span>📍</span> Rastreo
+            </div>
+          </div>
+
+          <p className="text-center text-xs mt-4" style={{ color: 'var(--ds-text-muted)' }}>
             Ocaña, Norte de Santander
           </p>
         </div>
