@@ -92,7 +92,7 @@ export default function RestauranteLayout({
         </Sheet>
       </div>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ background: 'var(--ds-bg)' }}>
+      <main className="flex-1 overflow-y-auto pt-4 pr-4 pb-4 pl-14 md:p-6" style={{ background: 'var(--ds-bg)' }}>
         {children}
       </main>
     </div>
