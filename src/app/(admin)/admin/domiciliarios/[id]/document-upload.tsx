@@ -101,7 +101,7 @@ export function DocumentUpload({ domiciliarioId, documentos }: Props) {
             </div>
 
             {doc.url && (
-              <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+              <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
                 Ver documento actual
               </a>
             )}

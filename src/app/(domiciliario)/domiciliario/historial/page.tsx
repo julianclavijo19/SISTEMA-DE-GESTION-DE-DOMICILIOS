@@ -32,12 +32,12 @@ interface DomicilioHistorial {
 }
 
 const ESTADO_COLOR: Record<EstadoDomicilio, string> = {
-  PENDIENTE: 'bg-yellow-500 text-white',
-  NOTIFICADO: 'bg-blue-500 text-white',
-  ASIGNADO: 'bg-indigo-500 text-white',
-  EN_CAMINO: 'bg-purple-500 text-white',
-  ENTREGADO: 'bg-green-500 text-white',
-  CANCELADO: 'bg-red-500 text-white',
+  PENDIENTE: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+  NOTIFICADO: 'bg-sky-100 text-sky-800 border border-sky-200',
+  ASIGNADO: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
+  EN_CAMINO: 'bg-purple-100 text-purple-800 border border-purple-200',
+  ENTREGADO: 'bg-green-100 text-green-800 border border-green-200',
+  CANCELADO: 'bg-red-100 text-red-800 border border-red-200',
 }
 
 export default function DomiciliarioHistorialPage() {

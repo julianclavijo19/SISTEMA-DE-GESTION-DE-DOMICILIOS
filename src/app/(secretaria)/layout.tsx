@@ -73,7 +73,7 @@ export default function SecretariaLayout({
 
   return (
     <div className="flex h-screen" style={{ background: 'var(--ds-bg)' }}>
-      <aside className="hidden md:flex md:w-[220px] md:flex-col md:flex-shrink-0">
+      <aside className="hidden md:flex md:w-[260px] md:flex-col md:flex-shrink-0">
         <NavContent pathname={pathname} />
       </aside>
 
@@ -85,7 +85,7 @@ export default function SecretariaLayout({
                 <List className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-[220px]" style={{ background: 'var(--ds-sidebar)' }}>
+            <SheetContent side="left" className="p-0 w-[260px]" style={{ background: 'var(--ds-sidebar)' }}>
               <NavContent pathname={pathname} onNavigate={() => setSheetOpen(false)} />
             </SheetContent>
           </Sheet>

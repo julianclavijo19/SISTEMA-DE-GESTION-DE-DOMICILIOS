@@ -1,5 +1,8 @@
 import { requireRole } from '@/lib/auth'
 import { createSupabaseServer } from '@/lib/supabase-server'
+import { DashboardCharts } from './dashboard-charts'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboardPage() {
   await requireRole(['ADMIN'])
@@ -17,10 +20,10 @@ export default async function AdminDashboardPage() {
   ayer.setDate(ayer.getDate() - 1)
   const ayerISO = ayer.toISOString()
 
-  // Semana pasada para comparación
-  const inicioSemana = new Date(hoy)
-  inicioSemana.setDate(inicioSemana.getDate() - 7)
-  const inicioSemanaISO = inicioSemana.toISOString()
+  // 7 días para gráficas
+  const hace7Dias = new Date(hoy)
+  hace7Dias.setDate(hace7Dias.getDate() - 6)
+  const hace7DiasISO = hace7Dias.toISOString()
 
   const [rActivos, rEntregados, rCancelados, rEnCurso, rDomActivos] = await Promise.all([
     supabase.from('domicilios').select('*', { count: 'exact', head: true }).gte('creado_en', hoyISO).lt('creado_en', mananaISO).neq('estado', 'CANCELADO'),
@@ -40,11 +43,33 @@ export default async function AdminDashboardPage() {
     .from('domicilios').select('valor_pedido')
     .gte('creado_en', ayerISO).lt('creado_en', hoyISO).eq('estado', 'ENTREGADO')
 
-  // Domicilios de la semana para promedio
-  const { count: domiciliosSemana } = await supabase
-    .from('domicilios').select('*', { count: 'exact', head: true })
-    .gte('creado_en', inicioSemanaISO).lt('creado_en', mananaISO)
-    .eq('estado', 'ENTREGADO')
+  // Domicilios últimos 7 días para gráficas
+  const { data: domicilios7d } = await supabase
+    .from('domicilios')
+    .select('creado_en, valor_pedido, comision_empresa, estado')
+    .gte('creado_en', hace7DiasISO)
+    .lt('creado_en', mananaISO)
+
+  // Preparar datos de gráficas (7 días)
+  const chartData: { dia: string; domicilios: number; ingresos: number; comisiones: number }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const fecha = new Date(hoy)
+    fecha.setDate(fecha.getDate() - i)
+    const fechaStr = fecha.toISOString().split('T')[0]
+    const diaLabel = fecha.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })
+
+    const delDia = (domicilios7d ?? []).filter(d => {
+      const dFecha = new Date(d.creado_en).toISOString().split('T')[0]
+      return dFecha === fechaStr
+    })
+
+    chartData.push({
+      dia: diaLabel,
+      domicilios: delDia.length,
+      ingresos: delDia.filter(d => d.estado === 'ENTREGADO').reduce((s, d) => s + Number(d.valor_pedido ?? 0), 0),
+      comisiones: delDia.filter(d => d.estado === 'ENTREGADO').reduce((s, d) => s + Number(d.comision_empresa ?? 0), 0),
+    })
+  }
 
   const ingresosBrutos = (entregadosHoy ?? []).reduce((s, d) => s + Number(d.valor_pedido ?? 0), 0)
   const comisionesDia = (entregadosHoy ?? []).reduce((s, d) => s + Number(d.comision_empresa ?? 0), 0)
@@ -52,15 +77,12 @@ export default async function AdminDashboardPage() {
 
   const variacion = ingresosAyer > 0 ? Math.round(((ingresosBrutos - ingresosAyer) / ingresosAyer) * 100) : 0
   const comisionPct = ingresosBrutos > 0 ? Math.round((comisionesDia / ingresosBrutos) * 100) : 0
-  const ticketPromedio = (entregadosHoy?.length ?? 0) > 0 ? Math.round(ingresosBrutos / entregadosHoy!.length) : 0
-  const promedioSemanal = Math.round((domiciliosSemana ?? 0) / 7)
 
   const totalHoy = (rActivos.count ?? 0) + (rCancelados.count ?? 0)
   const enCurso = rEnCurso.count ?? 0
   const entregados = rEntregados.count ?? 0
   const cancelados = rCancelados.count ?? 0
   const tasaCancelacion = totalHoy > 0 ? Math.round((cancelados / totalHoy) * 100) : 0
-  const tasaEntrega = totalHoy > 0 ? Math.round((entregados / totalHoy) * 100) : 0
 
   // Comisiones por restaurante (top 5)
   const comisionesPorRestaurante: Record<string, { comision: number; pedidos: number }> = {}
@@ -151,8 +173,8 @@ export default async function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* KPI row — numbers only, no icons, no colors */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* KPI row — responsive via .kpi-grid CSS class */}
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="kpi-card" style={{ flexDirection: 'column', gap: '0.25rem' }}>
           <span className="kpi-label">Domicilios hoy</span>
           <span className="kpi-value">{totalHoy}</span>
@@ -180,27 +202,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Secondary metrics row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: 'var(--ds-surface)', border: '1px solid var(--ds-border)', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ds-text-muted)', display: 'block' }}>Ticket promedio</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>${ticketPromedio.toLocaleString('es-CO')}</span>
-        </div>
-        <div style={{ background: 'var(--ds-surface)', border: '1px solid var(--ds-border)', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ds-text-muted)', display: 'block' }}>Tasa de entrega</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>{tasaEntrega}%</span>
-        </div>
-        <div style={{ background: 'var(--ds-surface)', border: '1px solid var(--ds-border)', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ds-text-muted)', display: 'block' }}>Prom. diario (7d)</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>{promedioSemanal}</span>
-        </div>
-        <div style={{ background: 'var(--ds-surface)', border: '1px solid var(--ds-border)', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ds-text-muted)', display: 'block' }}>Domiciliarios</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>{disponibles} libres · {enEntrega} ocupados</span>
-        </div>
-      </div>
-
-      {/* Main content */}
+      {/* Main content: table + right panels */}
       <div className="dash-content">
         {/* Left: Domicilios recientes table */}
         <div className="ds-table-card">
@@ -261,39 +263,25 @@ export default async function AdminDashboardPage() {
 
         {/* Right panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Restaurantes — tabla simple */}
-          <div className="panel-card">
-            <div className="panel-card-title">Restaurantes hoy</div>
-            {topRestaurantes.length === 0 ? (
-              <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin actividad</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--ds-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre</th>
-                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pedidos</th>
-                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topRestaurantes.map(([nombre, data]) => (
-                    <tr key={nombre} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
-                      <td style={{ padding: '0.5rem 0', color: 'var(--ds-text)' }}>{nombre}</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'right', color: 'var(--ds-text-secondary)', fontFamily: 'var(--font-ibm-mono)' }}>{data.pedidos}</td>
-                      <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>${data.comision.toLocaleString('es-CO')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Domiciliarios — tabla simple */}
+          {/* Domiciliarios — primero */}
           <div className="panel-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <span className="panel-card-title" style={{ marginBottom: 0 }}>Domiciliarios</span>
               <span style={{ fontSize: '0.6875rem', color: 'var(--ds-text-muted)' }}>{disponibles} disponibles</span>
             </div>
+
+            {/* Mini cards Libres / Ocupados */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ background: '#ECFDF5', borderRadius: '8px', padding: '0.5rem 0.75rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#059669', display: 'block' }}>{disponibles}</span>
+                <span style={{ fontSize: '0.6875rem', color: '#059669' }}>Libres</span>
+              </div>
+              <div style={{ background: '#FFFBEB', borderRadius: '8px', padding: '0.5rem 0.75rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#D97706', display: 'block' }}>{enEntrega}</span>
+                <span style={{ fontSize: '0.6875rem', color: '#D97706' }}>Ocupados</span>
+              </div>
+            </div>
+
             {listaDomiciliarios.length === 0 ? (
               <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin domiciliarios activos</p>
             ) : (
@@ -319,7 +307,39 @@ export default async function AdminDashboardPage() {
               </table>
             )}
           </div>
+
+          {/* Restaurantes — después */}
+          <div className="panel-card">
+            <div className="panel-card-title">Restaurantes hoy</div>
+            {topRestaurantes.length === 0 ? (
+              <p style={{ fontSize: '0.8125rem', color: 'var(--ds-text-muted)' }}>Sin actividad</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--ds-border)' }}>
+                    <th style={{ textAlign: 'left', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre</th>
+                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pedidos</th>
+                    <th style={{ textAlign: 'right', padding: '0.375rem 0', fontWeight: 500, color: 'var(--ds-text-muted)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topRestaurantes.map(([nombre, data]) => (
+                    <tr key={nombre} style={{ borderBottom: '1px solid var(--ds-border-light)' }}>
+                      <td style={{ padding: '0.5rem 0', color: 'var(--ds-text)' }}>{nombre}</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'right', color: 'var(--ds-text-secondary)', fontFamily: 'var(--font-ibm-mono)' }}>{data.pedidos}</td>
+                      <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, color: 'var(--ds-text)', fontFamily: 'var(--font-ibm-mono)' }}>${data.comision.toLocaleString('es-CO')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Gráficas — debajo del contenido principal */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <DashboardCharts data={chartData} />
       </div>
     </div>
   )

@@ -52,7 +52,7 @@ export function DashboardCharts({ data }: { data: ChartDataItem[] }) {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                 }}
               />
-              <Bar dataKey="domicilios" fill="#1E40AF" radius={[4, 4, 0, 0]} name="Domicilios" />
+              <Bar dataKey="domicilios" fill="#059669" radius={[4, 4, 0, 0]} name="Domicilios" />
             </BarChart>
           </ResponsiveContainer>
         </div>

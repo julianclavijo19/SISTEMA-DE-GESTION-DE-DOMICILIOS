@@ -116,7 +116,7 @@ export default function AdminLayout({
   return (
     <div className="flex h-screen" style={{ background: 'var(--ds-bg)' }}>
       {/* Sidebar — solo desktop, fijo */}
-      <aside className="hidden md:flex md:w-[220px] md:flex-col md:flex-shrink-0">
+      <aside className="hidden md:flex md:w-[260px] md:flex-col md:flex-shrink-0">
         <NavContent pathname={pathname} />
       </aside>
 
@@ -129,7 +129,7 @@ export default function AdminLayout({
                 <List size={20} />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-[220px]" style={{ background: 'var(--ds-sidebar)' }}>
+            <SheetContent side="left" className="p-0 w-[260px]" style={{ background: 'var(--ds-sidebar)' }}>
               <NavContent pathname={pathname} onNavigate={() => setSheetOpen(false)} />
             </SheetContent>
           </Sheet>

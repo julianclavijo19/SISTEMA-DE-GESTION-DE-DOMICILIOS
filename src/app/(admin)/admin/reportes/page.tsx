@@ -95,7 +95,7 @@ export default async function ReportesPage() {
       <h2 className="text-lg font-semibold">Resumen del Mes</h2>
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-icon kpi-icon-blue"><Package /></div>
+          <div className="kpi-icon kpi-icon-green"><Package /></div>
           <div className="kpi-body">
             <span className="kpi-label">Total domicilios</span>
             <span className="kpi-value">{totalMes}</span>

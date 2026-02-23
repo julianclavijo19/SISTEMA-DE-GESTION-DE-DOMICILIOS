@@ -320,7 +320,7 @@ export default function DomiciliarioInicioPage() {
       {domicilioActivo && (
         <Card className="border-primary">
           <CardHeader className="pb-3">
-            <Badge className="w-fit bg-blue-500 text-white">
+            <Badge className="w-fit bg-sky-100 text-sky-800 border border-sky-200">
               Pedido activo — {domicilioActivo.estado.replace('_', ' ')}
             </Badge>
             <CardTitle className="text-base mt-2">
