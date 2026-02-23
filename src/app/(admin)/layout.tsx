@@ -116,30 +116,27 @@ export default function AdminLayout({
   return (
     <div className="flex h-screen" style={{ background: 'var(--ds-bg)' }}>
       {/* Sidebar — solo desktop, fijo */}
-      <aside className="hidden md:flex md:w-[260px] md:flex-col md:flex-shrink-0">
+      <aside className="hidden md:flex md:w-[280px] md:flex-col md:flex-shrink-0">
         <NavContent pathname={pathname} />
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header — solo celular */}
-        <header className="ds-mobile-header md:hidden">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <List size={20} />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-[260px]" style={{ background: 'var(--ds-sidebar)' }}>
-              <NavContent pathname={pathname} onNavigate={() => setSheetOpen(false)} />
-            </SheetContent>
-          </Sheet>
-          <span className="brand-delivery" style={{ fontSize: '1.25rem' }}>delivery</span>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ background: 'var(--ds-bg)' }}>
-          {children}
-        </main>
+      {/* Mobile sidebar trigger — solo celular */}
+      <div className="md:hidden fixed top-3 left-3 z-50">
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" style={{ background: 'var(--ds-sidebar)', border: '1px solid var(--ds-border)', borderRadius: '8px' }}>
+              <List size={20} />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-[280px]" style={{ background: 'var(--ds-sidebar)' }}>
+            <NavContent pathname={pathname} onNavigate={() => setSheetOpen(false)} />
+          </SheetContent>
+        </Sheet>
       </div>
+
+      <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ background: 'var(--ds-bg)' }}>
+        {children}
+      </main>
     </div>
   )
 }
