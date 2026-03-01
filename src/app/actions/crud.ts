@@ -3,6 +3,22 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServer, createSupabaseAdmin } from '@/lib/supabase-server'
 
+// ─── helpers ────────────────────────────────────────────────────────────────────
+
+async function getUsuarioId() {
+  const supabase = await createSupabaseServer()
+  const { data: session } = await supabase.auth.getUser()
+  if (!session?.user) return null
+
+  const { data: usr } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('auth_id', session.user.id)
+    .single()
+
+  return usr?.id ?? null
+}
+
 // ─── DOMICILIARIO ───────────────────────────────────────────────────────────────
 
 export async function crearDomiciliario(data: {
@@ -178,92 +194,208 @@ export async function toggleEstadoRestaurante(usuarioId: string) {
 
 // ─── DOMICILIOS ─────────────────────────────────────────────────────────────────
 
+/** Secretaria o Admin asigna un domiciliario a un pedido */
 export async function asignarDomiciliarioAction(
   domicilioId: string,
   domiciliarioId: string,
 ) {
   const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
 
+  // Update domicilio
   const { error } = await supabase
     .from('domicilios')
     .update({
       domiciliario_id: domiciliarioId,
       estado: 'ASIGNADO',
+      actualizado_en: new Date().toISOString(),
     })
     .eq('id', domicilioId)
 
   if (error) throw new Error('Error al asignar: ' + error.message)
 
-  // Registrar en historial
-  const { data: session } = await supabase.auth.getUser()
-  if (session?.user) {
-    const { data: usr } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', session.user.id)
-      .single()
+  // Marcar domiciliario como no disponible
+  await supabase
+    .from('domiciliarios')
+    .update({ disponible: false })
+    .eq('id', domiciliarioId)
 
-    if (usr) {
-      await supabase.from('historial_estados').insert({
-        domicilio_id: domicilioId,
-        estado: 'ASIGNADO',
-        cambiado_por_id: usr.id,
-        nota: 'Asignado a domiciliario',
-      })
-    }
+  // Registrar en historial
+  if (usuarioId) {
+    await supabase.from('historial_estados').insert({
+      domicilio_id: domicilioId,
+      estado: 'ASIGNADO',
+      cambiado_por_id: usuarioId,
+      nota: 'Asignado por secretaría/admin',
+    })
   }
 
   revalidatePath('/secretaria/operaciones')
+  revalidatePath('/domiciliario/inicio')
+  revalidatePath('/admin/dashboard')
 }
 
+/** Reasignar domiciliario */
+export async function reasignarDomiciliarioAction(
+  domicilioId: string,
+  nuevoDomiciliarioId: string,
+  anteriorDomiciliarioId: string | null,
+) {
+  const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
+
+  const { error } = await supabase
+    .from('domicilios')
+    .update({
+      domiciliario_id: nuevoDomiciliarioId,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq('id', domicilioId)
+
+  if (error) throw new Error('Error reasignando: ' + error.message)
+
+  // Liberar domiciliario anterior
+  if (anteriorDomiciliarioId) {
+    await supabase
+      .from('domiciliarios')
+      .update({ disponible: true })
+      .eq('id', anteriorDomiciliarioId)
+  }
+
+  // Marcar nuevo domiciliario como ocupado
+  await supabase
+    .from('domiciliarios')
+    .update({ disponible: false })
+    .eq('id', nuevoDomiciliarioId)
+
+  // Registrar en historial
+  if (usuarioId) {
+    await supabase.from('historial_estados').insert({
+      domicilio_id: domicilioId,
+      estado: 'ASIGNADO',
+      cambiado_por_id: usuarioId,
+      nota: 'Reasignado a otro domiciliario',
+    })
+  }
+
+  revalidatePath('/secretaria/operaciones')
+  revalidatePath('/domiciliario/inicio')
+}
+
+/** Cancelar un domicilio */
 export async function cancelarDomicilioAction(
   domicilioId: string,
   motivo: string,
 ) {
   const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
 
-  const { data: session } = await supabase.auth.getUser()
-  let canceladoPorId: string | null = null
-
-  if (session?.user) {
-    const { data: usr } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', session.user.id)
-      .single()
-    canceladoPorId = usr?.id ?? null
-  }
+  // Obtener info del domicilio para liberar domiciliario
+  const { data: domicilio } = await supabase
+    .from('domicilios')
+    .select('domiciliario_id')
+    .eq('id', domicilioId)
+    .single()
 
   const { error } = await supabase
     .from('domicilios')
     .update({
       estado: 'CANCELADO',
       motivo_cancelacion: motivo,
-      cancelado_por_id: canceladoPorId,
+      cancelado_por_id: usuarioId,
+      actualizado_en: new Date().toISOString(),
     })
     .eq('id', domicilioId)
 
   if (error) throw new Error('Error al cancelar: ' + error.message)
 
+  // Liberar domiciliario si había uno asignado
+  if (domicilio?.domiciliario_id) {
+    await supabase
+      .from('domiciliarios')
+      .update({ disponible: true })
+      .eq('id', domicilio.domiciliario_id)
+  }
+
   // Registrar en historial
-  if (canceladoPorId) {
+  if (usuarioId) {
     await supabase.from('historial_estados').insert({
       domicilio_id: domicilioId,
       estado: 'CANCELADO',
-      cambiado_por_id: canceladoPorId,
+      cambiado_por_id: usuarioId,
       nota: motivo,
     })
   }
 
   revalidatePath('/secretaria/operaciones')
+  revalidatePath('/domiciliario/inicio')
+  revalidatePath('/admin/dashboard')
 }
 
+/** Domiciliario acepta un pedido pendiente */
+export async function aceptarPedidoAction(domicilioId: string) {
+  const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
+  if (!usuarioId) throw new Error('No autenticado')
+
+  // Get domiciliario profile
+  const { data: dom } = await supabase
+    .from('domiciliarios')
+    .select('id')
+    .eq('usuario_id', usuarioId)
+    .single()
+
+  if (!dom) throw new Error('Perfil de domiciliario no encontrado')
+
+  // Check the order is still PENDIENTE
+  const { data: pedido } = await supabase
+    .from('domicilios')
+    .select('estado')
+    .eq('id', domicilioId)
+    .single()
+
+  if (!pedido || pedido.estado !== 'PENDIENTE') {
+    throw new Error('El pedido ya no está disponible')
+  }
+
+  const { error } = await supabase
+    .from('domicilios')
+    .update({
+      domiciliario_id: dom.id,
+      estado: 'ASIGNADO',
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq('id', domicilioId)
+    .eq('estado', 'PENDIENTE')
+
+  if (error) throw new Error('No se pudo aceptar el pedido: ' + error.message)
+
+  // Marcar domiciliario como no disponible
+  await supabase
+    .from('domiciliarios')
+    .update({ disponible: false })
+    .eq('id', dom.id)
+
+  // Historial
+  await supabase.from('historial_estados').insert({
+    domicilio_id: domicilioId,
+    estado: 'ASIGNADO',
+    cambiado_por_id: usuarioId,
+    nota: 'Aceptado por domiciliario',
+  })
+
+  revalidatePath('/domiciliario/inicio')
+  revalidatePath('/secretaria/operaciones')
+}
+
+/** Domiciliario avanza el estado (ASIGNADO → EN_CAMINO → ENTREGADO) */
 export async function avanzarEstadoDomicilioAction(domicilioId: string) {
   const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
 
   const { data: domicilio } = await supabase
     .from('domicilios')
-    .select('estado')
+    .select('estado, valor_pedido, porcentaje_comision, domiciliario_id')
     .eq('id', domicilioId)
     .single()
 
@@ -277,9 +409,18 @@ export async function avanzarEstadoDomicilioAction(domicilioId: string) {
   const siguiente = flujo[domicilio.estado]
   if (!siguiente) throw new Error('No se puede avanzar desde el estado actual')
 
-  const updateData: Record<string, unknown> = { estado: siguiente }
+  const updateData: Record<string, unknown> = {
+    estado: siguiente,
+    actualizado_en: new Date().toISOString(),
+  }
+
   if (siguiente === 'ENTREGADO') {
     updateData.entregado_en = new Date().toISOString()
+    // Calcular comisión de la empresa
+    const comision = Math.round(
+      Number(domicilio.valor_pedido) * Number(domicilio.porcentaje_comision) / 100
+    )
+    updateData.comision_empresa = comision
   }
 
   const { error } = await supabase
@@ -289,25 +430,81 @@ export async function avanzarEstadoDomicilioAction(domicilioId: string) {
 
   if (error) throw new Error('Error al avanzar estado: ' + error.message)
 
-  // Registrar en historial
-  const { data: session } = await supabase.auth.getUser()
-  if (session?.user) {
-    const { data: usr } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_id', session.user.id)
-      .single()
+  // Si se entregó, liberar domiciliario
+  if (siguiente === 'ENTREGADO' && domicilio.domiciliario_id) {
+    await supabase
+      .from('domiciliarios')
+      .update({ disponible: true })
+      .eq('id', domicilio.domiciliario_id)
+  }
 
-    if (usr) {
-      await supabase.from('historial_estados').insert({
-        domicilio_id: domicilioId,
-        estado: siguiente,
-        cambiado_por_id: usr.id,
-      })
-    }
+  // Registrar en historial
+  if (usuarioId) {
+    await supabase.from('historial_estados').insert({
+      domicilio_id: domicilioId,
+      estado: siguiente,
+      cambiado_por_id: usuarioId,
+      nota: siguiente === 'ENTREGADO' ? 'Entrega confirmada por domiciliario' : 'En camino al destino',
+    })
   }
 
   revalidatePath('/domiciliario/inicio')
+  revalidatePath('/secretaria/operaciones')
+  revalidatePath('/admin/dashboard')
+}
+
+/** Secretaria/Admin crea un pedido */
+export async function crearDomicilioSecretariaAction(data: {
+  restaurante_id: string
+  nombre_cliente: string
+  telefono_cliente: string
+  direccion_entrega: string
+  referencia_direccion?: string
+  observaciones?: string
+  valor_pedido: number
+}) {
+  const supabase = await createSupabaseServer()
+  const usuarioId = await getUsuarioId()
+  if (!usuarioId) throw new Error('No autenticado')
+
+  // Get commission config
+  const { data: config } = await supabase
+    .from('configuracion_sistema')
+    .select('porcentaje_comision')
+    .limit(1)
+    .single()
+
+  const porcentaje = Number(config?.porcentaje_comision ?? 20)
+  const comision = Math.round(data.valor_pedido * porcentaje / 100)
+
+  const { data: nuevoDomicilio, error } = await supabase.from('domicilios').insert({
+    restaurante_id: data.restaurante_id,
+    creado_por_id: usuarioId,
+    nombre_cliente: data.nombre_cliente,
+    telefono_cliente: data.telefono_cliente,
+    direccion_entrega: data.direccion_entrega,
+    referencia_direccion: data.referencia_direccion || null,
+    observaciones: data.observaciones || null,
+    valor_pedido: data.valor_pedido,
+    porcentaje_comision: porcentaje,
+    comision_empresa: comision,
+    estado: 'PENDIENTE',
+  }).select('id').single()
+
+  if (error) throw new Error('Error creando domicilio: ' + error.message)
+
+  // Historial
+  if (nuevoDomicilio) {
+    await supabase.from('historial_estados').insert({
+      domicilio_id: nuevoDomicilio.id,
+      estado: 'PENDIENTE',
+      cambiado_por_id: usuarioId,
+      nota: 'Pedido creado por secretaría',
+    })
+  }
+
+  revalidatePath('/secretaria/operaciones')
+  revalidatePath('/admin/dashboard')
 }
 
 export async function crearNovedadAction(
@@ -315,21 +512,12 @@ export async function crearNovedadAction(
   descripcion: string,
 ) {
   const supabase = await createSupabaseServer()
-
-  const { data: session } = await supabase.auth.getUser()
-  if (!session?.user) throw new Error('No autenticado')
-
-  const { data: usr } = await supabase
-    .from('usuarios')
-    .select('id')
-    .eq('auth_id', session.user.id)
-    .single()
-
-  if (!usr) throw new Error('Usuario no encontrado')
+  const usuarioId = await getUsuarioId()
+  if (!usuarioId) throw new Error('No autenticado')
 
   const { error } = await supabase.from('novedades').insert({
     domicilio_id: domicilioId,
-    reportado_por_id: usr.id,
+    reportado_por_id: usuarioId,
     descripcion,
   })
 
@@ -337,4 +525,6 @@ export async function crearNovedadAction(
 
   revalidatePath('/domiciliario/inicio')
   revalidatePath('/secretaria/operaciones')
+  revalidatePath('/secretaria/novedades')
+  revalidatePath('/admin/novedades')
 }

@@ -49,6 +49,7 @@ model usuarios {
   historial_cambiados  historial_estados[] @relation("historial_cambiado_por")
   cortes_creados       cortes_caja[]       @relation("cortes_creado_por")
   cancelaciones        domicilios[]        @relation("domicilio_cancelado_por")
+  domicilios_creados   domicilios[]        @relation("domicilio_creado_por")
 
   @@index([auth_id])
   @@index([rol])
@@ -98,6 +99,7 @@ model domicilios {
   id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   restaurante_id      String           @db.Uuid
   domiciliario_id     String?          @db.Uuid
+  creado_por_id       String?          @db.Uuid
   nombre_cliente      String
   telefono_cliente    String
   direccion_entrega   String
@@ -115,6 +117,7 @@ model domicilios {
 
   restaurante       restaurantes       @relation(fields: [restaurante_id], references: [id])
   domiciliario      domiciliarios?     @relation(fields: [domiciliario_id], references: [id])
+  creado_por        usuarios?          @relation("domicilio_creado_por", fields: [creado_por_id], references: [id])
   cancelado_por     usuarios?          @relation("domicilio_cancelado_por", fields: [cancelado_por_id], references: [id])
   historial_estados historial_estados[]
   novedades         novedades[]
@@ -123,6 +126,7 @@ model domicilios {
   @@index([estado])
   @@index([restaurante_id])
   @@index([domiciliario_id])
+  @@index([creado_por_id])
   @@index([creado_en])
 }
 

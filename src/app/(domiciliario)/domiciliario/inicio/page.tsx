@@ -21,6 +21,11 @@ import {
 } from '@/lib/icons'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  aceptarPedidoAction,
+  avanzarEstadoDomicilioAction,
+  crearNovedadAction,
+} from '@/app/actions/crud'
 
 type EstadoDomicilio =
   | 'PENDIENTE'
@@ -35,6 +40,7 @@ interface Domicilio {
   nombre_cliente: string
   telefono_cliente: string
   direccion_entrega: string
+  referencia_direccion: string | null
   observaciones: string | null
   valor_pedido: number
   estado: EstadoDomicilio
@@ -61,10 +67,10 @@ export default function DomiciliarioInicioPage() {
   const [domicilioActivo, setDomicilioActivo] = useState<Domicilio | null>(null)
   const [domiciliosPendientes, setDomiciliosPendientes] = useState<Domicilio[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
   const [novedadDialog, setNovedadDialog] = useState(false)
   const [novedadTexto, setNovedadTexto] = useState('')
   const [novedadLoading, setNovedadLoading] = useState(false)
-  const [usuarioId, setUsuarioId] = useState<string | null>(null)
 
   const cargarPerfil = useCallback(async () => {
     const {
@@ -80,7 +86,6 @@ export default function DomiciliarioInicioPage() {
       .single()
 
     if (!usuario) return
-    setUsuarioId(usuario.id)
 
     const { data: dom } = await supabase
       .from('domiciliarios')
@@ -154,12 +159,19 @@ export default function DomiciliarioInicioPage() {
           cargarDomicilios(perfil.id)
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'domiciliarios' },
+        () => {
+          cargarPerfil()
+        }
+      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, perfil, cargarDomicilios])
+  }, [supabase, perfil, cargarDomicilios, cargarPerfil])
 
   // Toggle availability
   async function toggleDisponible() {
@@ -180,84 +192,59 @@ export default function DomiciliarioInicioPage() {
     toast.success(newValue ? 'Estás disponible' : 'No disponible')
   }
 
-  // Accept an order
+  // Accept an order — using server action (bypasses RLS issues)
   async function aceptarPedido(domicilioId: string) {
     if (!perfil) return
-
-    const { error } = await supabase
-      .from('domicilios')
-      .update({
-        domiciliario_id: perfil.id,
-        estado: 'ASIGNADO',
-      })
-      .eq('id', domicilioId)
-      .eq('estado', 'PENDIENTE')
-
-    if (error) {
-      toast.error('No se pudo aceptar el pedido')
-      return
+    setActionLoading(true)
+    try {
+      await aceptarPedidoAction(domicilioId)
+      setPerfil((p) => (p ? { ...p, disponible: false } : p))
+      toast.success('¡Pedido aceptado!')
+      cargarDomicilios(perfil.id)
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo aceptar el pedido')
+    } finally {
+      setActionLoading(false)
     }
-
-    await supabase
-      .from('domiciliarios')
-      .update({ disponible: false })
-      .eq('id', perfil.id)
-
-    setPerfil((p) => (p ? { ...p, disponible: false } : p))
-    toast.success('¡Pedido aceptado!')
   }
 
-  // Advance state
+  // Advance state — using server action (records historial, computes comision, sets entregado_en)
   async function avanzarEstado() {
-    if (!domicilioActivo) return
+    if (!domicilioActivo || !perfil) return
+    setActionLoading(true)
 
-    const nextState: Record<string, EstadoDomicilio> = {
-      ASIGNADO: 'EN_CAMINO',
-      EN_CAMINO: 'ENTREGADO',
-    }
+    const siguiente = domicilioActivo.estado === 'ASIGNADO' ? 'EN_CAMINO' : 'ENTREGADO'
 
-    const siguiente = nextState[domicilioActivo.estado]
-    if (!siguiente) return
+    try {
+      await avanzarEstadoDomicilioAction(domicilioActivo.id)
 
-    const { error } = await supabase
-      .from('domicilios')
-      .update({ estado: siguiente })
-      .eq('id', domicilioActivo.id)
-
-    if (error) {
-      toast.error('Error actualizando estado')
-      return
-    }
-
-    if (siguiente === 'ENTREGADO') {
-      // Free the domiciliario
-      await supabase
-        .from('domiciliarios')
-        .update({ disponible: true })
-        .eq('id', perfil!.id)
-
-      setPerfil((p) => (p ? { ...p, disponible: true } : p))
-      toast.success('¡Entrega completada!')
-    } else {
-      toast.success(`Estado actualizado a: ${siguiente.replace('_', ' ')}`)
+      if (siguiente === 'ENTREGADO') {
+        setPerfil((p) => (p ? { ...p, disponible: true } : p))
+        toast.success('¡Entrega completada! 🎉')
+      } else {
+        toast.success('Estado actualizado: En camino')
+      }
+      cargarDomicilios(perfil.id)
+    } catch (err: any) {
+      toast.error(err.message || 'Error actualizando estado')
+    } finally {
+      setActionLoading(false)
     }
   }
 
+  // Report novedad — using server action
   async function reportarNovedad() {
-    if (!novedadTexto.trim() || !usuarioId || !domicilioActivo) return
+    if (!novedadTexto.trim() || !domicilioActivo) return
     setNovedadLoading(true)
-    const { error } = await supabase.from('novedades').insert({
-      domicilio_id: domicilioActivo.id,
-      reportado_por_id: usuarioId,
-      descripcion: novedadTexto.trim(),
-    })
-    setNovedadLoading(false)
-    if (error) {
-      toast.error('Error al reportar novedad')
-    } else {
+    try {
+      await crearNovedadAction(domicilioActivo.id, novedadTexto.trim())
       toast.success('Novedad reportada')
       setNovedadDialog(false)
       setNovedadTexto('')
+    } catch (err: any) {
+      toast.error(err.message || 'Error al reportar novedad')
+    } finally {
+      setNovedadLoading(false)
     }
   }
 
@@ -276,7 +263,7 @@ export default function DomiciliarioInicioPage() {
 
   const ESTADO_BTN_LABEL: Record<string, string> = {
     ASIGNADO: '🚀 Estoy en camino',
-    EN_CAMINO: '✅ Entregado',
+    EN_CAMINO: '✅ Marcar como entregado',
   }
 
   if (loading) {
@@ -370,6 +357,11 @@ export default function DomiciliarioInicioPage() {
                 <NavigationArrow className="h-3 w-3" />
                 {domicilioActivo.direccion_entrega}
               </button>
+              {domicilioActivo.referencia_direccion && (
+                <p className="text-xs text-muted-foreground ml-4 italic">
+                  Ref: {domicilioActivo.referencia_direccion}
+                </p>
+              )}
               <a
                 href={`tel:${domicilioActivo.telefono_cliente}`}
                 className="flex items-center gap-1 text-primary"
@@ -381,7 +373,9 @@ export default function DomiciliarioInicioPage() {
 
             <Separator />
 
-            <p className="text-muted-foreground">{domicilioActivo.observaciones}</p>
+            {domicilioActivo.observaciones && (
+              <p className="text-muted-foreground">{domicilioActivo.observaciones}</p>
+            )}
 
             <div className="flex justify-between font-bold text-base">
               <span>Valor:</span>
@@ -391,8 +385,12 @@ export default function DomiciliarioInicioPage() {
 
           <CardFooter className="flex flex-col gap-2">
             {ESTADO_BTN_LABEL[domicilioActivo.estado] && (
-              <Button className="w-full h-14 text-lg" onClick={avanzarEstado}>
-                {ESTADO_BTN_LABEL[domicilioActivo.estado]}
+              <Button
+                className="w-full h-14 text-lg"
+                onClick={avanzarEstado}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Actualizando...' : ESTADO_BTN_LABEL[domicilioActivo.estado]}
               </Button>
             )}
             <Button
@@ -445,6 +443,11 @@ export default function DomiciliarioInicioPage() {
                   <MapPin className="h-3 w-3 text-muted-foreground" />
                   <span>{dom.direccion_entrega}</span>
                 </div>
+                {dom.referencia_direccion && (
+                  <p className="text-xs text-muted-foreground ml-4 italic">
+                    Ref: {dom.referencia_direccion}
+                  </p>
+                )}
                 <p className="font-semibold text-right">
                   {formatCurrency(dom.valor_pedido)}
                 </p>
@@ -453,9 +456,10 @@ export default function DomiciliarioInicioPage() {
                 <Button
                   className="w-full"
                   onClick={() => aceptarPedido(dom.id)}
+                  disabled={actionLoading}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Aceptar pedido
+                  {actionLoading ? 'Aceptando...' : 'Aceptar pedido'}
                 </Button>
               </CardFooter>
             </Card>

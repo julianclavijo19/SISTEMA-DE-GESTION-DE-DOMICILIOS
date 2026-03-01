@@ -5,6 +5,8 @@ import { createSupabaseBrowser } from '@/lib/supabase-browser'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
@@ -40,7 +42,15 @@ import {
   XCircle,
   ArrowRight,
   Storefront,
+  Plus,
+  PaperPlaneTilt,
 } from '@/lib/icons'
+import {
+  asignarDomiciliarioAction,
+  reasignarDomiciliarioAction,
+  cancelarDomicilioAction,
+  crearDomicilioSecretariaAction,
+} from '@/app/actions/crud'
 
 type EstadoDomicilio =
   | 'PENDIENTE'
@@ -54,6 +64,7 @@ interface Domicilio {
   id: string
   restaurante_id: string
   domiciliario_id: string | null
+  creado_por_id: string | null
   nombre_cliente: string
   telefono_cliente: string
   direccion_entrega: string
@@ -94,6 +105,15 @@ interface Domiciliario {
   }
 }
 
+interface Restaurante {
+  id: string
+  direccion: string | null
+  usuarios: {
+    nombre: string
+    telefono: string
+  }
+}
+
 const ESTADO_COLOR: Record<EstadoDomicilio, string> = {
   PENDIENTE: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
   NOTIFICADO: 'bg-sky-100 text-sky-800 border border-sky-200',
@@ -117,6 +137,7 @@ export default function OperacionesPage() {
 
   const [domicilios, setDomicilios] = useState<Domicilio[]>([])
   const [domiciliarios, setDomiciliarios] = useState<Domiciliario[]>([])
+  const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
   const [tabActual, setTabActual] = useState('activos')
 
@@ -132,6 +153,19 @@ export default function OperacionesPage() {
     domicilioId: string | null
   }>({ open: false, domicilioId: null })
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
+
+  // Crear pedido dialog
+  const [crearDialog, setCrearDialog] = useState(false)
+  const [crearLoading, setCrearLoading] = useState(false)
+  const [crearForm, setCrearForm] = useState({
+    restaurante_id: '',
+    nombre_cliente: '',
+    telefono_cliente: '',
+    direccion_entrega: '',
+    referencia_direccion: '',
+    observaciones: '',
+    valor_pedido: '',
+  })
 
   const cargarDomicilios = useCallback(async () => {
     const { data, error } = await supabase
@@ -164,15 +198,27 @@ export default function OperacionesPage() {
     setDomiciliarios((data as unknown as Domiciliario[]) || [])
   }, [supabase])
 
+  const cargarRestaurantes = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('restaurantes')
+      .select('id, direccion, usuarios!inner(nombre, telefono)')
+
+    if (error) {
+      toast.error('Error cargando restaurantes')
+      return
+    }
+    setRestaurantes((data as unknown as Restaurante[]) || [])
+  }, [supabase])
+
   // Initial load
   useEffect(() => {
     async function init() {
       setLoading(true)
-      await Promise.all([cargarDomicilios(), cargarDomiciliarios()])
+      await Promise.all([cargarDomicilios(), cargarDomiciliarios(), cargarRestaurantes()])
       setLoading(false)
     }
     init()
-  }, [cargarDomicilios, cargarDomiciliarios])
+  }, [cargarDomicilios, cargarDomiciliarios, cargarRestaurantes])
 
   // Realtime subscription
   useEffect(() => {
@@ -199,66 +245,39 @@ export default function OperacionesPage() {
     }
   }, [supabase, cargarDomicilios, cargarDomiciliarios])
 
-  // Actions
+  // Actions — now using server actions
   async function asignarDomiciliario() {
     if (!asignarDialog.domicilio || !domiciliarioSeleccionado) return
 
-    const { error } = await supabase
-      .from('domicilios')
-      .update({
-        domiciliario_id: domiciliarioSeleccionado,
-        estado: 'ASIGNADO',
-      })
-      .eq('id', asignarDialog.domicilio.id)
-
-    if (error) {
-      toast.error('Error asignando domiciliario: ' + error.message)
-      return
+    try {
+      await asignarDomiciliarioAction(asignarDialog.domicilio.id, domiciliarioSeleccionado)
+      toast.success('Domiciliario asignado correctamente')
+      setAsignarDialog({ open: false, domicilio: null })
+      setDomiciliarioSeleccionado('')
+      cargarDomicilios()
+      cargarDomiciliarios()
+    } catch (err: any) {
+      toast.error(err.message || 'Error asignando domiciliario')
     }
-
-    // Mark domiciliario as not available
-    await supabase
-      .from('domiciliarios')
-      .update({ disponible: false })
-      .eq('id', domiciliarioSeleccionado)
-
-    toast.success('Domiciliario asignado correctamente')
-    setAsignarDialog({ open: false, domicilio: null })
-    setDomiciliarioSeleccionado('')
   }
 
   async function reasignarDomiciliario() {
     if (!asignarDialog.domicilio || !domiciliarioSeleccionado) return
 
-    const domicilioAnteriorId = asignarDialog.domicilio.domiciliario_id
-
-    const { error } = await supabase
-      .from('domicilios')
-      .update({ domiciliario_id: domiciliarioSeleccionado })
-      .eq('id', asignarDialog.domicilio.id)
-
-    if (error) {
-      toast.error('Error reasignando: ' + error.message)
-      return
+    try {
+      await reasignarDomiciliarioAction(
+        asignarDialog.domicilio.id,
+        domiciliarioSeleccionado,
+        asignarDialog.domicilio.domiciliario_id
+      )
+      toast.success('Domiciliario reasignado correctamente')
+      setAsignarDialog({ open: false, domicilio: null })
+      setDomiciliarioSeleccionado('')
+      cargarDomicilios()
+      cargarDomiciliarios()
+    } catch (err: any) {
+      toast.error(err.message || 'Error reasignando')
     }
-
-    // Free previous domiciliario
-    if (domicilioAnteriorId) {
-      await supabase
-        .from('domiciliarios')
-        .update({ disponible: true })
-        .eq('id', domicilioAnteriorId)
-    }
-
-    // Busy new domiciliario
-    await supabase
-      .from('domiciliarios')
-      .update({ disponible: false })
-      .eq('id', domiciliarioSeleccionado)
-
-    toast.success('Domiciliario reasignado correctamente')
-    setAsignarDialog({ open: false, domicilio: null })
-    setDomiciliarioSeleccionado('')
   }
 
   async function cancelarDomicilio() {
@@ -267,22 +286,55 @@ export default function OperacionesPage() {
       return
     }
 
-    const { error } = await supabase
-      .from('domicilios')
-      .update({
-        estado: 'CANCELADO',
-        motivo_cancelacion: motivoCancelacion.trim(),
-      })
-      .eq('id', cancelarDialog.domicilioId)
-
-    if (error) {
-      toast.error('Error cancelando domicilio: ' + error.message)
-      return
+    try {
+      await cancelarDomicilioAction(cancelarDialog.domicilioId, motivoCancelacion.trim())
+      toast.success('Domicilio cancelado')
+      setCancelarDialog({ open: false, domicilioId: null })
+      setMotivoCancelacion('')
+      cargarDomicilios()
+      cargarDomiciliarios()
+    } catch (err: any) {
+      toast.error(err.message || 'Error cancelando domicilio')
     }
+  }
 
-    toast.success('Domicilio cancelado')
-    setCancelarDialog({ open: false, domicilioId: null })
-    setMotivoCancelacion('')
+  async function crearPedido(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!crearForm.restaurante_id) { toast.error('Seleccione un restaurante'); return }
+    if (!crearForm.nombre_cliente.trim()) { toast.error('Nombre del cliente requerido'); return }
+    if (!crearForm.telefono_cliente.trim()) { toast.error('Teléfono del cliente requerido'); return }
+    if (!crearForm.direccion_entrega.trim()) { toast.error('Dirección de entrega requerida'); return }
+    if (!crearForm.valor_pedido || Number(crearForm.valor_pedido) <= 0) { toast.error('El valor debe ser mayor a 0'); return }
+
+    setCrearLoading(true)
+    try {
+      await crearDomicilioSecretariaAction({
+        restaurante_id: crearForm.restaurante_id,
+        nombre_cliente: crearForm.nombre_cliente.trim(),
+        telefono_cliente: crearForm.telefono_cliente.trim(),
+        direccion_entrega: crearForm.direccion_entrega.trim(),
+        referencia_direccion: crearForm.referencia_direccion.trim() || undefined,
+        observaciones: crearForm.observaciones.trim() || undefined,
+        valor_pedido: Number(crearForm.valor_pedido),
+      })
+      toast.success('Pedido creado exitosamente')
+      setCrearDialog(false)
+      setCrearForm({
+        restaurante_id: '',
+        nombre_cliente: '',
+        telefono_cliente: '',
+        direccion_entrega: '',
+        referencia_direccion: '',
+        observaciones: '',
+        valor_pedido: '',
+      })
+      cargarDomicilios()
+    } catch (err: any) {
+      toast.error(err.message || 'Error creando pedido')
+    } finally {
+      setCrearLoading(false)
+    }
   }
 
   // Filtered lists
@@ -334,17 +386,23 @@ export default function OperacionesPage() {
             {domiciliariosDisponibles.length} domiciliarios disponibles
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            cargarDomicilios()
-            cargarDomiciliarios()
-          }}
-        >
-          <ArrowsClockwise className="h-4 w-4 mr-2" />
-          Actualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              cargarDomicilios()
+              cargarDomiciliarios()
+            }}
+          >
+            <ArrowsClockwise className="h-4 w-4 mr-2" />
+            Actualizar
+          </Button>
+          <Button size="sm" onClick={() => setCrearDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Crear pedido
+          </Button>
+        </div>
       </div>
 
       {/* Domiciliarios bar */}
@@ -562,6 +620,112 @@ export default function OperacionesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CREATE ORDER Dialog */}
+      <Dialog open={crearDialog} onOpenChange={setCrearDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PaperPlaneTilt className="h-5 w-5" />
+              Crear nuevo pedido
+            </DialogTitle>
+            <DialogDescription>
+              Registre un pedido desde secretaría. Seleccione el restaurante y complete los datos del cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={crearPedido} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Restaurante *</Label>
+              <Select
+                value={crearForm.restaurante_id}
+                onValueChange={(v) => setCrearForm(prev => ({ ...prev, restaurante_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar restaurante" />
+                </SelectTrigger>
+                <SelectContent>
+                  {restaurantes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.usuarios?.nombre} {r.direccion ? `— ${r.direccion}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Nombre del cliente *</Label>
+                <Input
+                  value={crearForm.nombre_cliente}
+                  onChange={(e) => setCrearForm(prev => ({ ...prev, nombre_cliente: e.target.value }))}
+                  placeholder="Juan Pérez"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Teléfono *</Label>
+                <Input
+                  value={crearForm.telefono_cliente}
+                  onChange={(e) => setCrearForm(prev => ({ ...prev, telefono_cliente: e.target.value }))}
+                  placeholder="3001234567"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Dirección de entrega *</Label>
+              <Input
+                value={crearForm.direccion_entrega}
+                onChange={(e) => setCrearForm(prev => ({ ...prev, direccion_entrega: e.target.value }))}
+                placeholder="Calle 10 #5-23, Barrio Centro"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Referencia / punto de encuentro</Label>
+              <Input
+                value={crearForm.referencia_direccion}
+                onChange={(e) => setCrearForm(prev => ({ ...prev, referencia_direccion: e.target.value }))}
+                placeholder="Casa esquinera azul, al lado de la tienda"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Detalle del pedido</Label>
+              <Textarea
+                value={crearForm.observaciones}
+                onChange={(e) => setCrearForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                placeholder="2x Hamburguesa especial, 1x Gaseosa..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Valor del pedido (COP) *</Label>
+              <Input
+                type="number"
+                value={crearForm.valor_pedido}
+                onChange={(e) => setCrearForm(prev => ({ ...prev, valor_pedido: e.target.value }))}
+                placeholder="25000"
+                min={0}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCrearDialog(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={crearLoading}>
+                <PaperPlaneTilt className="h-4 w-4 mr-2" />
+                {crearLoading ? 'Creando...' : 'Crear pedido'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -590,10 +754,17 @@ function DomicilioCard({
           <Badge className={ESTADO_COLOR[domicilio.estado]}>
             {ESTADO_LABEL[domicilio.estado]}
           </Badge>
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {formatTime(domicilio.creado_en)}
-          </span>
+          <div className="flex items-center gap-2">
+            {domicilio.creado_por_id && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                Secretaría
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {formatTime(domicilio.creado_en)}
+            </span>
+          </div>
         </div>
         <CardTitle className="text-base mt-2">
           {domicilio.restaurantes?.usuarios?.nombre ?? 'Restaurante'}
@@ -611,6 +782,11 @@ function DomicilioCard({
           <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
           <span>{domicilio.direccion_entrega}</span>
         </div>
+        {domicilio.referencia_direccion && (
+          <div className="text-xs text-muted-foreground ml-6 italic">
+            Ref: {domicilio.referencia_direccion}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Phone className="h-4 w-4 text-muted-foreground" />
           <span>{domicilio.telefono_cliente}</span>
@@ -618,9 +794,11 @@ function DomicilioCard({
 
         <Separator />
 
-        <p className="text-muted-foreground line-clamp-2">
-          {domicilio.observaciones}
-        </p>
+        {domicilio.observaciones && (
+          <p className="text-muted-foreground line-clamp-2">
+            {domicilio.observaciones}
+          </p>
+        )}
 
         <div className="flex justify-between font-medium">
           <span>Valor pedido:</span>

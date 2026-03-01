@@ -114,12 +114,12 @@ export default async function AdminDashboardPage() {
     .sort((a, b) => b[1].comision - a[1].comision)
     .slice(0, 5)
 
-  // Últimos domicilios (8 más recientes)
+  // Últimos domicilios (10 más recientes) — with domiciliario + origin info
   const { data: ultimosDomicilios } = await supabase
     .from('domicilios')
-    .select('id, nombre_cliente, direccion_entrega, valor_pedido, estado, creado_en, restaurantes(usuarios(nombre))')
+    .select('id, nombre_cliente, direccion_entrega, valor_pedido, estado, creado_en, creado_por_id, restaurantes(usuarios(nombre)), domiciliarios(usuarios(nombre))')
     .order('creado_en', { ascending: false })
-    .limit(8)
+    .limit(10)
 
   const fechaHoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long',
@@ -213,16 +213,18 @@ export default async function AdminDashboardPage() {
               <TableRow>
                 <TableHead className="text-[11px] uppercase tracking-wider">Cliente</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Restaurante</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Domiciliario</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Dirección</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Valor</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Estado</TableHead>
+                <TableHead className="text-[11px] uppercase tracking-wider">Origen</TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wider">Hace</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(ultimosDomicilios ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8 text-sm">
                     Sin domicilios registrados aún
                   </TableCell>
                 </TableRow>
@@ -231,11 +233,19 @@ export default async function AdminDashboardPage() {
                   <TableRow key={d.id}>
                     <TableCell className="font-medium">{d.nombre_cliente}</TableCell>
                     <TableCell>{d.restaurantes?.usuarios?.nombre ?? '—'}</TableCell>
-                    <TableCell className="truncate max-w-[180px] text-muted-foreground">{d.direccion_entrega}</TableCell>
+                    <TableCell>{d.domiciliarios?.usuarios?.nombre ?? <span className="text-muted-foreground text-xs">Sin asignar</span>}</TableCell>
+                    <TableCell className="truncate max-w-[160px] text-muted-foreground">{d.direccion_entrega}</TableCell>
                     <TableCell className="font-medium" style={{ fontFamily: 'var(--font-ibm-mono)' }}>
                       ${Number(d.valor_pedido ?? 0).toLocaleString('es-CO')}
                     </TableCell>
                     <TableCell><EstadoBadge estado={d.estado} /></TableCell>
+                    <TableCell>
+                      {d.creado_por_id ? (
+                        <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-800 px-2 py-0.5 text-[10px] font-medium">Secretaría</span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-medium">Restaurante</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDistanceToNow(new Date(d.creado_en), { addSuffix: true, locale: es })}
                     </TableCell>

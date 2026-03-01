@@ -94,7 +94,8 @@ export default function SolicitarDomicilioPage() {
       .limit(1)
       .single()
 
-    const porcentaje = config?.porcentaje_comision ?? 20
+    const porcentaje = Number(config?.porcentaje_comision ?? 20)
+    const comision = Math.round(result.data.valor_pedido * porcentaje / 100)
 
     const { error } = await supabase.from('domicilios').insert({
       restaurante_id: restauranteId,
@@ -104,6 +105,7 @@ export default function SolicitarDomicilioPage() {
       observaciones: result.data.observaciones || null,
       valor_pedido: result.data.valor_pedido,
       porcentaje_comision: porcentaje,
+      comision_empresa: comision,
       estado: 'PENDIENTE',
     })
 
